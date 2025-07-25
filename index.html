@@ -1,13 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>My first three.js app</title>
-    <style>
-      body { margin: 0; }
-    </style>
-  </head>
-  <body>
-    <script type="module" src="/main.js"></script>
-  </body>
+
+<head>
+  <meta charset="utf-8">
+  <title>My first three.js app</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Put this in your HTML (e.g., index.html) -->
+  <div id="cameraCoords" style="
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  color: white;
+  background: rgba(0,0,0,0.5);
+  padding: 4px 8px;
+  font-family: monospace;
+  font-size: 14px;
+  z-index: 999;
+">
+    x: 0.00, y: 0.00, z: 0.00
+  </div>
+
+
+  <script type="module" src="/main.js"></script>
+</body>
+
 </html>
