@@ -16,9 +16,9 @@ gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 document.body.appendChild(renderer.domElement);
 
 // Lighting
-scene.add(new THREE.AmbientLight(0xffffff, 0.3));
-const light = new THREE.DirectionalLight(0xffffff, 0.7);
-light.position.set(0, 255, 0);
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const light = new THREE.DirectionalLight(0xffffff, 0.9);
+light.position.set(0, 150, 0);
 scene.add(light);
 
 // Controls

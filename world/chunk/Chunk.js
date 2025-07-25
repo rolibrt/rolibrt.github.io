@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import ChunkSlice from './ChunkSlice';
-import { AllDirections, Direction, HorizontalDirections } from '../Direction';
+import { Direction, HorizontalDirections } from '../Direction';
+import { createMeshFromGeometry } from '../block/MeshFactory';
+import { buildChunkGeometry } from '../block/GeometryBuilder';
+import { atlasTexture } from '../atlas';
 import {
   CHUNK_SIZE, CHUNK_SLICES, CHUNK_SHIFT, isOutside,
   isOutsideHeight, vertexShader, fragmentShader, getChunkKey
@@ -17,15 +20,37 @@ export default class Chunk {
   generate() {
     const baseX = this.chunkX << CHUNK_SHIFT;
     const baseZ = this.chunkZ << CHUNK_SHIFT;
-    const worldY = 40;
+    const baseHeight = 40;
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
         const worldX = baseX + x;
         const worldZ = baseZ + z;
-        const height = worldY + Math.floor(3 + Math.sin(worldX * 0.15) * 2 + Math.cos(worldZ * 0.15) * 2);
+
+        // Terrain height with variation
+        const height = baseHeight + Math.floor(
+          3 + Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3 +
+          (Math.sin(worldX * 0.05 + worldZ * 0.05) * 2)
+        );
+
         for (let y = 0; y <= height; y++) {
-          this.setBlock(x, y, z, 1);
+          if (y === height) {
+            // Top block is grass
+            this.setBlock(x, y, z, 4);
+          } else if (y >= height - 2) {
+            // Just below grass is dirt
+            this.setBlock(x, y, z, 3);
+          } else {
+            // Occasionally add gravel or cobble
+            const rand = Math.random();
+            if (rand < 0.05) {
+              this.setBlock(x, y, z, 5); // gravel
+            } else if (rand < 0.1) {
+              this.setBlock(x, y, z, 2); // cobble
+            } else {
+              this.setBlock(x, y, z, 1); // stone
+            }
+          }
         }
       }
     }
@@ -88,48 +113,16 @@ export default class Chunk {
 
   buildSliceMesh(slice) {
     if (!slice) return null;
-    const positions = [], normals = [], indices = [];
-    let index = 0;
-    const wx = (this.chunkX << CHUNK_SHIFT);
-    const wy = (slice.heightIndex << CHUNK_SHIFT);
-    const wz = (this.chunkZ << CHUNK_SHIFT);
-    for (let y = 0; y < CHUNK_SIZE; y++) {
-      for (let x = 0; x < CHUNK_SIZE; x++) {
-        for (let z = 0; z < CHUNK_SIZE; z++) {
-          const blockId = slice.getBlock(x, y, z);
-          if (blockId === 0) continue;
-          for (const direction of AllDirections) {
-            const nx = x + direction.vec[0];
-            const ny = y + direction.vec[1];
-            const nz = z + direction.vec[2];
-            if (this.isSolid(slice,wx, wy, wz, nx, ny, nz)) continue;
-            for (const [dx, dy, dz] of direction.corners) {
-              positions.push(x + dx, y + dy, z + dz);
-              normals.push(...direction.vec);
-            }
-            indices.push(
-              index, index + 1, index + 2,
-              index + 2, index + 3, index
-            );
-            index += 4;
-          }
-        }
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geometry.setIndex(indices);
-
-    const material = new THREE.RawShaderMaterial({
-      vertexShader,
-      fragmentShader
+    const material = new THREE.MeshLambertMaterial({
+      map: atlasTexture,
+      transparent: false,
+      alphaTest: 0.5,
     });
-    return new THREE.Mesh(geometry, material);
+    return createMeshFromGeometry(buildChunkGeometry(this, slice), material);
   }
 
-  isSolid(slice, wx, wy, wz, nx, ny, nz) {
-    if (isOutsideHeight(wy + ny)) return false;
+  getType(slice, wx, wy, wz, nx, ny, nz) {
+    if (isOutsideHeight(wy + ny)) return 0;
     var id;
     if (isOutside(ny)) {
       id = this.getBlock(nx, wy + ny, nz);
@@ -138,7 +131,7 @@ export default class Chunk {
     } else {
       id = slice.getBlock(nx, ny, nz);
     }
-    return id !== null && id !== 0;
+    return id !== null ? id : 0;
   }
 
   buildSlice(slice) {

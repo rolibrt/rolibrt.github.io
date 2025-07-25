@@ -4,22 +4,36 @@ uniform mat4 projectionMatrix;
 
 attribute vec3 position;
 attribute vec3 normal;
+attribute vec2 uv;
 
 varying vec3 vNormal;
+varying vec2 vUv;
 
 void main() {
     vNormal = normal;
+    vUv = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }
 `;
 export const fragmentShader = `
 precision mediump float;
 
+uniform sampler2D atlas;
+
 varying vec3 vNormal;
+varying vec2 vUv;
 
 void main() {
+    vec3 normal = normalize(vNormal);
 
-    gl_FragColor = vec4(vNormal * 0.5 + 0.5, 1.0);
+    // Hardcoded light direction — coming diagonally from top-right-front
+    // Fake directional light (from above)
+    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+    float light = dot(normal, lightDir);
+    light = clamp(light, 0.2, 1.0); // minimum ambient light
+
+    vec4 tex = texture2D(atlas, vUv);
+    gl_FragColor = vec4(tex.rgb * light, tex.a);
 }
 `;
 export const CHUNK_COUNT = Math.pow(20, 3);
