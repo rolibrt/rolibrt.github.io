@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, isOutside3D, isOutsideHeight } from '../constants';
+import { CHUNK_SIZE, isOutside3D } from '../constants';
 import { SingleBlockChunkData } from './ChunkData';
 
 export default class ChunkSlice {
@@ -12,7 +12,8 @@ export default class ChunkSlice {
         }
       }
     }
-    this.mesh = null;
+    this.transparentMesh = null;
+    this.opaqueMesh = null;
   }
 
   getBlock(x, y, z) {

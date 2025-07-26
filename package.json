@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "noisejs": "^2.1.0",
     "three": "^0.178.0"
   },
   "devDependencies": {

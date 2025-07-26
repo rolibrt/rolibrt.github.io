@@ -1,14 +1,14 @@
 // GeometryBuilder.js
 import { AllDirections } from '../Direction.js';
-import { BlockIdMap } from './BlockRegistry.js';
-import { SPRITE_SIZE, TEXTURE_SIZE, N_SPRITE_SIZE, UV_OFFSETS } from '../atlas'
+import { BlockIdMap, BlockTypes } from './BlockRegistry.js';
 import {
     CHUNK_SIZE, CHUNK_SHIFT
 } from '../constants';
 
 export function buildChunkGeometry(chunk, slice) {
     const positions = [], normals = [], indices = [], uvs = [];
-    let index = 0;
+    const tpositions = [], tnormals = [], tindices = [], tuvs = [];
+    let index = 0, tindex = 0;
     const wx = (chunk.chunkX << CHUNK_SHIFT);
     const wy = (slice.heightIndex << CHUNK_SHIFT);
     const wz = (chunk.chunkZ << CHUNK_SHIFT);
@@ -18,60 +18,94 @@ export function buildChunkGeometry(chunk, slice) {
                 const blockId = slice.getBlock(x, y, z);
                 if (blockId === 0) continue;
                 const block = BlockIdMap[blockId];
-
                 if (block.hasCustomGeometry()) {
-                    const { positions: p, normals: n, indices: i, uvs: u } = block.buildGeometry(wx, wy, wz);
-                    positions.push(...p);
-                    normals.push(...n);
-                    uvs.push(...u);
-                    indices.push(...i.map(i => i + index));
-                    index += p.length / 3;
-                } else {
-                    for (const dir of AllDirections) {
-                        const nx = x + dir.vec[0];
-                        const ny = y + dir.vec[1];
-                        const nz = z + dir.vec[2];
+                    if (block.isTransparent()) {
+                        const blockGeometry = block.buildGeometry(chunk, slice, tindex, x, y, z);
+                        tpositions.push(...blockGeometry.positions);
+                        tnormals.push(...blockGeometry.normals);
+                        tuvs.push(...blockGeometry.uvs);
+                        tindices.push(...blockGeometry.indices);
+                        tindex += blockGeometry.positions.length / 3;
+                    } else {
+                        const blockGeometry = block.buildGeometry(chunk, slice, index, x, y, z);
+                        positions.push(...blockGeometry.positions);
+                        normals.push(...blockGeometry.normals);
+                        uvs.push(...blockGeometry.uvs);
+                        indices.push(...blockGeometry.indices);
+                        index += blockGeometry.positions.length / 3;
+                    }
+                } else if (block.hasUniformTextures()) {
+                    const uv = block.getUVCoords('ALL');
+                    for (const face of AllDirections) {
+                        const nx = x + face.vec[0];
+                        const ny = y + face.vec[1];
+                        const nz = z + face.vec[2];
                         const neighborId = chunk.getType(slice, wx, wy, wz, nx, ny, nz);
                         const neighbor = BlockIdMap[neighborId] ?? BlockTypes.AIR;
-
-                        if (!neighbor.isOpaque()) {
-                            const uv = getUVs(blockId, 0);
-                            for (let i = 0; i < 4; i++) {
-                                const [dx, dy, dz] = dir.corners[i];
-                                positions.push(x + dx, y + dy, z + dz);
-                                normals.push(...dir.vec);
-                                uvs.push(uv[i * 2], uv[i * 2 + 1]);
+                        if (neighbor.isTransparent()) {
+                            if (block.isTransparent()) {
+                                if (block === BlockTypes.WATER && block === neighbor) continue;
+                                for (let i = 0; i < 4; i++) {
+                                    const [dx, dy, dz] = face.corners[i];
+                                    tpositions.push(x + dx, y + dy, z + dz);
+                                    tnormals.push(...face.vec);
+                                    tuvs.push(uv[i * 2], uv[i * 2 + 1]);
+                                }
+                                tindices.push(tindex, tindex + 1, tindex + 2, tindex + 2, tindex + 3, tindex);
+                                tindex += 4;
+                            } else {
+                                for (let i = 0; i < 4; i++) {
+                                    const [dx, dy, dz] = face.corners[i];
+                                    positions.push(x + dx, y + dy, z + dz);
+                                    normals.push(...face.vec);
+                                    uvs.push(uv[i * 2], uv[i * 2 + 1]);
+                                }
+                                indices.push(index, index + 1, index + 2, index + 2, index + 3, index);
+                                index += 4;
                             }
-                            indices.push(index, index + 1, index + 2, index + 2, index + 3, index);
-                            index += 4;
+                        }
+                    }
+                } else {
+                    for (const face of AllDirections) {
+                        const nx = x + face.vec[0];
+                        const ny = y + face.vec[1];
+                        const nz = z + face.vec[2];
+                        const neighborId = chunk.getType(slice, wx, wy, wz, nx, ny, nz);
+                        const neighbor = BlockIdMap[neighborId] ?? BlockTypes.AIR;
+                        if (neighbor.isTransparent()) {
+                            const uv = block.getUVCoords(face.name);
+                            if (block.isTransparent()) {
+                                for (let i = 0; i < 4; i++) {
+                                    const [dx, dy, dz] = face.corners[i];
+                                    tpositions.push(x + dx, y + dy, z + dz);
+                                    tnormals.push(...face.vec);
+                                    tuvs.push(uv[i * 2], uv[i * 2 + 1]);
+                                }
+                                tindices.push(tindex, tindex + 1, tindex + 2, tindex + 2, tindex + 3, tindex);
+                                tindex += 4;
+                            } else {
+                                for (let i = 0; i < 4; i++) {
+                                    const [dx, dy, dz] = face.corners[i];
+                                    positions.push(x + dx, y + dy, z + dz);
+                                    normals.push(...face.vec);
+                                    uvs.push(uv[i * 2], uv[i * 2 + 1]);
+                                }
+                                indices.push(index, index + 1, index + 2, index + 2, index + 3, index);
+                                index += 4;
+                            }
                         }
                     }
                 }
             }
         }
     }
-    return { positions, normals, indices, uvs };
-}
-
-const TILES_PER_ROW = TEXTURE_SIZE / SPRITE_SIZE; // 32
-
-/**
- * Get UV coordinates for a tile index (left-top origin).
- * @param {number} index - Tile index from 0 to 1023 (32x32 atlas).
- * @returns {number[]} - UV coordinates (array of 4 corners).
- */
-function getUVs(tileX, tileY) {
-    const uMin = tileX * N_SPRITE_SIZE;
-    const vMin = 1 - (tileY + 1) * N_SPRITE_SIZE;  // flipped V axis
-    const uMax = (tileX + 1) * N_SPRITE_SIZE;
-    const vMax = 1 - tileY * N_SPRITE_SIZE;
-
-    // Return UVs in this order (matching your face corners):
-    // top-right, bottom-right, bottom-left, top-left
     return [
-        uMax, vMax,
-        uMax, vMin,
-        uMin, vMin,
-        uMin, vMax,
+        { positions, normals, indices, uvs },
+        { 
+            positions: tpositions, 
+            normals: tnormals, 
+            indices: tindices, 
+            uvs: tuvs 
+        }
     ];
 }

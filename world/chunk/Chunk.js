@@ -1,13 +1,11 @@
-import * as THREE from 'three';
 import ChunkSlice from './ChunkSlice';
 import { Direction, HorizontalDirections } from '../Direction';
 import { createMeshFromGeometry } from '../block/MeshFactory';
 import { buildChunkGeometry } from '../block/GeometryBuilder';
-import { atlasTexture } from '../atlas';
 import {
-  CHUNK_SIZE, CHUNK_SLICES, CHUNK_SHIFT, isOutside,
-  isOutsideHeight, vertexShader, fragmentShader, getChunkKey
+  CHUNK_SIZE, CHUNK_HEIGHT, CHUNK_SLICES, CHUNK_SHIFT, isOutside, isOutsideHeight, getChunkKey
 } from '../constants';
+import { BlockTypes } from '../block/BlockRegistry';
 
 export default class Chunk {
   constructor(world, chunkX, chunkZ) {
@@ -15,41 +13,63 @@ export default class Chunk {
     this.chunkX = chunkX;
     this.chunkZ = chunkZ;
     this.slices = Array.from({ length: CHUNK_SLICES }, (_, heightIndex) => new ChunkSlice(heightIndex, 0));
-  }
+  }generate() {
+  const baseX = this.chunkX << CHUNK_SHIFT;
+  const baseZ = this.chunkZ << CHUNK_SHIFT;
+  const baseHeight = 40;
+  const seaLevel = 42;
 
-  generate() {
-    const baseX = this.chunkX << CHUNK_SHIFT;
-    const baseZ = this.chunkZ << CHUNK_SHIFT;
-    const baseHeight = 40;
+  for (let x = 0; x < CHUNK_SIZE; x++) {
+    for (let z = 0; z < CHUNK_SIZE; z++) {
+      const worldX = baseX + x;
+      const worldZ = baseZ + z;
 
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-      for (let z = 0; z < CHUNK_SIZE; z++) {
-        const worldX = baseX + x;
-        const worldZ = baseZ + z;
+      // Terrain height with variation
+      const height = baseHeight + Math.floor(
+        3 + Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3 +
+        (Math.sin(worldX * 0.05 + worldZ * 0.05) * 2)
+      );
 
-        // Terrain height with variation
-        const height = baseHeight + Math.floor(
-          3 + Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3 +
-          (Math.sin(worldX * 0.05 + worldZ * 0.05) * 2)
-        );
+      const maxY = Math.max(height, seaLevel);
 
-        for (let y = 0; y <= height; y++) {
-          if (y === height) {
-            // Top block is grass
-            this.setBlock(x, y, z, 4);
-          } else if (y >= height - 2) {
-            // Just below grass is dirt
-            this.setBlock(x, y, z, 3);
+      for (let y = 0; y <= maxY; y++) {
+        if (y > height && y <= seaLevel) {
+          this.setBlock(x, y, z, 8); // WATER
+        } else if (y === height) {
+          this.setBlock(x, y, z, height < seaLevel + 2 ? 6 : 4); // SAND near sea, GRASS higher
+        } else if (y >= height - 2) {
+          this.setBlock(x, y, z, 3); // DIRT
+        } else {
+          const rand = Math.random();
+          if (rand < 0.05) {
+            this.setBlock(x, y, z, 5); // GRAVEL
+          } else if (rand < 0.1) {
+            this.setBlock(x, y, z, 2); // COBBLE
           } else {
-            // Occasionally add gravel or cobble
-            const rand = Math.random();
-            if (rand < 0.05) {
-              this.setBlock(x, y, z, 5); // gravel
-            } else if (rand < 0.1) {
-              this.setBlock(x, y, z, 2); // cobble
-            } else {
-              this.setBlock(x, y, z, 1); // stone
-            }
+            this.setBlock(x, y, z, 1); // STONE
+          }
+        }
+      }
+    }
+  }
+}
+
+
+
+  placeTree(x, y, z) {
+    // Simple oak tree
+    const trunkHeight = 4 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < trunkHeight; i++) {
+      this.setBlock(x, y + i, z, BlockTypes.LOG.id);
+    }
+
+    const leafStart = y + trunkHeight - 2;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dy = 0; dy <= 3; dy++) {
+          const dist = Math.abs(dx) + Math.abs(dz) + dy;
+          if (dist <= 4) {
+            this.setBlock(x + dx, leafStart + dy, z + dz, BlockTypes.LEAVES.id);
           }
         }
       }
@@ -113,12 +133,7 @@ export default class Chunk {
 
   buildSliceMesh(slice) {
     if (!slice) return null;
-    const material = new THREE.MeshLambertMaterial({
-      map: atlasTexture,
-      transparent: false,
-      alphaTest: 0.5,
-    });
-    return createMeshFromGeometry(buildChunkGeometry(this, slice), material);
+    return createMeshFromGeometry(buildChunkGeometry(this, slice));
   }
 
   getType(slice, wx, wy, wz, nx, ny, nz) {
@@ -135,18 +150,31 @@ export default class Chunk {
   }
 
   buildSlice(slice) {
-    const mesh = this.buildSliceMesh(slice);
-    mesh.position.set(
+    const [opaque, transparent] = this.buildSliceMesh(slice);
+    opaque.renderOrder = 1;
+    opaque.position.set(
       this.chunkX << CHUNK_SHIFT,
       slice.heightIndex << CHUNK_SHIFT,
       this.chunkZ << CHUNK_SHIFT
     );
-    if (slice.mesh) {
-      this.world.scene.remove(slice.mesh);
-      slice.mesh.geometry.dispose();
+    transparent.renderOrder = 2;
+    transparent.position.set(
+      this.chunkX << CHUNK_SHIFT,
+      slice.heightIndex << CHUNK_SHIFT,
+      this.chunkZ << CHUNK_SHIFT
+    );
+    if (slice.opaqueMesh) {
+      this.world.scene.remove(slice.opaqueMesh);
+      slice.opaqueMesh.geometry.dispose();
     }
-    slice.mesh = mesh;
-    this.world.scene.add(slice.mesh);
+    if (slice.transparentMesh) {
+      this.world.scene.remove(slice.transparentMesh);
+      slice.transparentMesh.geometry.dispose();
+    }
+    slice.opaqueMesh = opaque;
+    slice.transparentMesh = transparent;
+    this.world.scene.add(slice.transparentMesh);
+    this.world.scene.add(slice.opaqueMesh);
     slice.dirty = false;
   }
 

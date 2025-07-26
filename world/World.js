@@ -1,11 +1,13 @@
 import Chunk from './chunk/Chunk';
 import { CHUNK_SIZE, CHUNK_SHIFT, getChunkKey } from './constants';
+import { Noise } from 'noisejs';
 
 export default class World {
   constructor(scene, name) {
     this.scene = scene;
     this.name = name;
     this.chunks = new Map();
+    this.noise = new Noise(Math.random());
     this.generate();
   }
 

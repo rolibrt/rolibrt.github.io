@@ -4,7 +4,7 @@ import World from './world/World';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ });
 const gl = renderer.getContext();
 renderer.setSize(window.innerWidth, window.innerHeight);
 gl.enable(gl.BLEND);
@@ -61,7 +61,6 @@ let lastUpdate = 0;
 const updateInterval = 50;
 
 function animate(time) {
-  requestAnimationFrame(animate);
 
   const delta = clock.getDelta();
   if (time - lastUpdate >= updateInterval) {
@@ -90,6 +89,7 @@ function animate(time) {
     coordElement.textContent = `x: ${pos.x.toFixed(2)}, y: ${pos.y.toFixed(2)}, z: ${pos.z.toFixed(2)}`;
   }
   renderer.render(scene, camera);
+  requestAnimationFrame(animate);
 }
 
 animate();
