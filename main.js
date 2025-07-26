@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import World from './world/World';
+import { LocalPlayer } from './player/LocalPlayer';
+import { RemotePlayer } from './player/RemotePlayer';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({ });
+const renderer = new THREE.WebGLRenderer({});
 const gl = renderer.getContext();
 renderer.setSize(window.innerWidth, window.innerHeight);
 gl.enable(gl.BLEND);
@@ -15,43 +17,26 @@ gl.frontFace(gl.CW);
 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 document.body.appendChild(renderer.domElement);
 
+// Controls
+const controls = new PointerLockControls(camera, document.body);
+document.body.addEventListener('click', () => controls.lock());
+
+const players = new Map();
+
+const localPlayer = new LocalPlayer('you', 'YourName', camera, controls, scene);
+localPlayer.setPosition(0, 50, 0);
+players.set(localPlayer.id, localPlayer);
+
+// On network join:
+const other = new RemotePlayer('123', 'OtherPlayer', scene);
+other.setPosition(0, 50, 0);
+players.set(other.id, other);
+
 // Lighting
 scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 const light = new THREE.DirectionalLight(0xffffff, 0.9);
 light.position.set(0, 150, 0);
 scene.add(light);
-
-// Controls
-const controls = new PointerLockControls(camera, document.body);
-document.body.addEventListener('click', () => controls.lock());
-scene.add(controls.object);
-camera.position.z = 30;
-camera.position.y = 20;
-
-// Movement
-const move = { forward: false, backward: false, left: false, right: false, up: false, down: false };
-const velocity = new THREE.Vector3();
-const direction = new THREE.Vector3();
-document.addEventListener('keydown', e => {
-  switch (e.code) {
-    case 'KeyW': move.forward = true; break;
-    case 'KeyS': move.backward = true; break;
-    case 'KeyA': move.left = true; break;
-    case 'KeyD': move.right = true; break;
-    case 'Space': move.up = true; break;
-    case 'ShiftLeft': move.down = true; break;
-  }
-});
-document.addEventListener('keyup', e => {
-  switch (e.code) {
-    case 'KeyW': move.forward = false; break;
-    case 'KeyS': move.backward = false; break;
-    case 'KeyA': move.left = false; break;
-    case 'KeyD': move.right = false; break;
-    case 'Space': move.up = false; break;
-    case 'ShiftLeft': move.down = false; break;
-  }
-});
 
 const worlds = [];
 worlds[0] = new World(scene, "world");
@@ -61,28 +46,15 @@ let lastUpdate = 0;
 const updateInterval = 50;
 
 function animate(time) {
-
   const delta = clock.getDelta();
   if (time - lastUpdate >= updateInterval) {
     worlds.forEach(world => world.tick(camera));
     lastUpdate = time;
   }
-  if (controls.isLocked) {
-    direction.z = Number(move.forward) - Number(move.backward);
-    direction.x = Number(move.right) - Number(move.left);
-    direction.y = Number(move.up) - Number(move.down);
-    direction.normalize();
-
-    const speed = 20;
-    velocity.x = direction.x * speed * delta;
-    velocity.y = direction.y * speed * delta;
-    velocity.z = direction.z * speed * delta;
-
-    controls.moveRight(velocity.x);
-    controls.moveForward(velocity.z);
-    controls.object.position.y += velocity.y;
+  localPlayer.update(delta);
+  for (const player of players.values()) {
+    player.update(delta); // localPlayer moves, others interpolate
   }
-
   const coordElement = document.getElementById('cameraCoords');
   if (coordElement) {
     const pos = camera.position;
@@ -99,3 +71,16 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+function simulateRemoteMovement() {
+  // Random new position within a 20x20x20 cube
+  const newPos = new THREE.Vector3(
+    (Math.random() - 0.5),
+    50, // keep player standing on ground (y=1)
+    (Math.random() - 0.5)
+  );
+  other.updateRemotePosition(newPos);
+}
+
+// Call simulateRemoteMovement every 2 seconds
+setInterval(simulateRemoteMovement, 50);
