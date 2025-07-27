@@ -14,6 +14,7 @@ export default class ChunkSlice {
     }
     this.transparentMesh = null;
     this.opaqueMesh = null;
+    this.create = true;
   }
 
   getBlock(x, y, z) {

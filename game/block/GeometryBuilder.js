@@ -3,7 +3,7 @@ import { AllDirections } from '../Direction.js';
 import { BlockIdMap, BlockTypes } from './BlockRegistry.js';
 import {
     CHUNK_SIZE, CHUNK_SHIFT
-} from '../constants';
+} from '../constants.js';
 
 export function buildChunkGeometry(chunk, slice) {
     const positions = [], normals = [], indices = [], uvs = [];
@@ -101,11 +101,11 @@ export function buildChunkGeometry(chunk, slice) {
     }
     return [
         { positions, normals, indices, uvs },
-        { 
-            positions: tpositions, 
-            normals: tnormals, 
-            indices: tindices, 
-            uvs: tuvs 
+        {
+            positions: tpositions,
+            normals: tnormals,
+            indices: tindices,
+            uvs: tuvs
         }
     ];
-}
+};

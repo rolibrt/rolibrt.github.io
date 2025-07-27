@@ -1,5 +1,5 @@
 import ChunkSlice from './ChunkSlice';
-import { Direction, HorizontalDirections } from '../Direction';
+import { AllDirections, Direction, HorizontalDirections } from '../Direction';
 import { createMeshFromGeometry } from '../block/MeshFactory';
 import { buildChunkGeometry } from '../block/GeometryBuilder';
 import {
@@ -13,48 +13,49 @@ export default class Chunk {
     this.chunkX = chunkX;
     this.chunkZ = chunkZ;
     this.slices = Array.from({ length: CHUNK_SLICES }, (_, heightIndex) => new ChunkSlice(heightIndex, 0));
-  }generate() {
-  const baseX = this.chunkX << CHUNK_SHIFT;
-  const baseZ = this.chunkZ << CHUNK_SHIFT;
-  const baseHeight = 40;
-  const seaLevel = 42;
+    this.ready = false;
+  }
 
-  for (let x = 0; x < CHUNK_SIZE; x++) {
-    for (let z = 0; z < CHUNK_SIZE; z++) {
-      const worldX = baseX + x;
-      const worldZ = baseZ + z;
+  generate() {
+    const baseX = this.chunkX << CHUNK_SHIFT;
+    const baseZ = this.chunkZ << CHUNK_SHIFT;
+    const baseHeight = 40;
+    const seaLevel = 42;
 
-      // Terrain height with variation
-      const height = baseHeight + Math.floor(
-        3 + Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3 +
-        (Math.sin(worldX * 0.05 + worldZ * 0.05) * 2)
-      );
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        const worldX = baseX + x;
+        const worldZ = baseZ + z;
 
-      const maxY = Math.max(height, seaLevel);
+        // Terrain height with variation
+        const height = baseHeight + Math.floor(
+          3 + Math.sin(worldX * 0.1) * 3 + Math.cos(worldZ * 0.1) * 3 +
+          (Math.sin(worldX * 0.05 + worldZ * 0.05) * 2)
+        );
 
-      for (let y = 0; y <= maxY; y++) {
-        if (y > height && y <= seaLevel) {
-          this.setBlock(x, y, z, 8); // WATER
-        } else if (y === height) {
-          this.setBlock(x, y, z, height < seaLevel + 2 ? 6 : 4); // SAND near sea, GRASS higher
-        } else if (y >= height - 2) {
-          this.setBlock(x, y, z, 3); // DIRT
-        } else {
-          const rand = Math.random();
-          if (rand < 0.05) {
-            this.setBlock(x, y, z, 5); // GRAVEL
-          } else if (rand < 0.1) {
-            this.setBlock(x, y, z, 2); // COBBLE
+        const maxY = Math.max(height, seaLevel);
+
+        for (let y = 0; y <= maxY; y++) {
+          if (y > height && y <= seaLevel) {
+            this.setBlock(x, y, z, 8); // WATER
+          } else if (y === height) {
+            this.setBlock(x, y, z, height < seaLevel + 2 ? 6 : 4); // SAND near sea, GRASS higher
+          } else if (y >= height - 2) {
+            this.setBlock(x, y, z, 3); // DIRT
           } else {
-            this.setBlock(x, y, z, 1); // STONE
+            const rand = Math.random();
+            if (rand < 0.05) {
+              this.setBlock(x, y, z, 5); // GRAVEL
+            } else if (rand < 0.1) {
+              this.setBlock(x, y, z, 2); // COBBLE
+            } else {
+              this.setBlock(x, y, z, 1); // STONE
+            }
           }
         }
       }
     }
   }
-}
-
-
 
   placeTree(x, y, z) {
     // Simple oak tree
@@ -74,22 +75,6 @@ export default class Chunk {
         }
       }
     }
-  }
-
-  setDirty(value) {
-    this.slices.forEach(slice => slice.dirty = value);
-  }
-
-  setNeighborsDirty() {
-    HorizontalDirections.forEach(direction => this.setNeighborDirty(direction));
-  }
-
-  setNeighborDirty(direction) {
-    const cx = this.chunkX + direction.vec[0];
-    const cz = this.chunkZ + direction.vec[2];
-    const neighborChunk = this.world.chunks.get(getChunkKey(cx, cz));
-    if (!neighborChunk) return;
-    neighborChunk.setDirty(true);
   }
 
   setSliceDirty(height, value) {
@@ -131,11 +116,6 @@ export default class Chunk {
     return this.slices[y >> CHUNK_SHIFT].getBlock(x, y & (CHUNK_SIZE - 1), z);
   }
 
-  buildSliceMesh(slice) {
-    if (!slice) return null;
-    return createMeshFromGeometry(buildChunkGeometry(this, slice));
-  }
-
   getType(slice, wx, wy, wz, nx, ny, nz) {
     if (isOutsideHeight(wy + ny)) return 0;
     var id;
@@ -149,8 +129,8 @@ export default class Chunk {
     return id !== null ? id : 0;
   }
 
-  buildSlice(slice) {
-    const [opaque, transparent] = this.buildSliceMesh(slice);
+  uploadMesh(slice, [opaqueData, transparentData]) {
+    const [opaque, transparent] = createMeshFromGeometry([opaqueData, transparentData]);
     opaque.renderOrder = 1;
     opaque.position.set(
       this.chunkX << CHUNK_SHIFT,
@@ -175,10 +155,30 @@ export default class Chunk {
     slice.transparentMesh = transparent;
     this.world.scene.add(slice.transparentMesh);
     this.world.scene.add(slice.opaqueMesh);
-    slice.dirty = false;
+    slice.create = slice.dirty = slice.update = false;
   }
 
   buildMeshes() {
-    return this.slices.forEach(slice => this.buildSlice(slice));
+    this.slices.forEach(slice => {
+      this.uploadMesh(slice, buildChunkGeometry(this, slice));
+    });
+    this.ready = true;
+    HorizontalDirections.forEach(direction => {
+      const cx = this.chunkX + direction.vec[0];
+      const cz = this.chunkZ + direction.vec[2];
+      const neighborChunk = this.world.chunks.get(getChunkKey(cx, cz));
+      if (neighborChunk) neighborChunk.update = true;
+    });
+  }
+
+  updateMeshes() {
+    this.slices
+      .forEach(slice => {
+        if (slice.dirty) {
+          this.uploadMesh(slice, buildChunkGeometry(this, slice));
+        } else if (slice.update) {
+          this.uploadMesh(slice, buildChunkGeometry(this, slice));
+        }
+      });
   }
 };

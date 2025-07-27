@@ -1,13 +1,11 @@
 import Chunk from './chunk/Chunk';
 import { CHUNK_SIZE, CHUNK_SHIFT, getChunkKey } from './constants';
-import { Noise } from 'noisejs';
 
 export default class World {
   constructor(scene, name) {
     this.scene = scene;
     this.name = name;
     this.chunks = new Map();
-    this.noise = new Noise(Math.random());
     this.generate();
   }
 
@@ -20,13 +18,7 @@ export default class World {
   }
 
   tick(camera) {
-    this.chunks.forEach((chunk, _) => {
-      chunk.slices.forEach(slice => {
-        if (slice.dirty) {
-          chunk.buildSlice(slice);
-        }
-      });
-    });
+    let start = performance.now();
     const x = camera.position.x >> CHUNK_SHIFT;
     const z = camera.position.z >> CHUNK_SHIFT;
     for (let cx = x - 2; cx <= x + 2; cx++) {
@@ -34,6 +26,13 @@ export default class World {
         this.getOrCreateChunk(cx, cz);
       }
     }
+    let stop = performance.now();
+    console.log(' ');
+    console.log(stop - start);
+    start = performance.now();
+    this.updateChunks();
+    stop = performance.now();
+    console.log(stop - start);
   }
 
   getOrCreateChunk(x, z) {
@@ -43,8 +42,6 @@ export default class World {
       chunk = new Chunk(this, x, z);
       chunk.generate();
       this.chunks.set(key, chunk);
-      chunk.buildMeshes();
-      chunk.setNeighborsDirty();
     }
     return chunk;
   }
@@ -59,5 +56,15 @@ export default class World {
     const chunk = this.chunks.get(getChunkKey(wx >> CHUNK_SHIFT, wz >> CHUNK_SHIFT));
     if (!chunk) return;
     return chunk.setBlock(wx & (CHUNK_SIZE - 1), wy, wz & (CHUNK_SIZE - 1), id);
+  }
+
+  updateChunks() {
+    this.chunks.forEach((chunk, _) => {
+      if (!chunk.ready) {
+        chunk.buildMeshes();
+      } else {
+        chunk.updateMeshes();
+      }
+    });
   }
 };

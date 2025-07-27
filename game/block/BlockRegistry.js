@@ -3,7 +3,7 @@ import { Block } from './Block.js';
 import { AllDirections } from '../Direction.js';
 import {
   CHUNK_SIZE, CHUNK_SHIFT
-} from '../constants';
+} from '../constants.js';
 import waterVerts from './shapes/water.json';
 
 export const BlockTypes = {
