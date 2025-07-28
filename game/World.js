@@ -18,7 +18,7 @@ export default class World {
   }
 
   tick(camera) {
-    let start = performance.now();
+    //let start = performance.now();
     const x = camera.position.x >> CHUNK_SHIFT;
     const z = camera.position.z >> CHUNK_SHIFT;
     for (let cx = x - 2; cx <= x + 2; cx++) {
@@ -26,13 +26,13 @@ export default class World {
         this.getOrCreateChunk(cx, cz);
       }
     }
-    let stop = performance.now();
+    /*let stop = performance.now();
     console.log(' ');
     console.log(stop - start);
-    start = performance.now();
+    start = performance.now();*/
     this.updateChunks();
-    stop = performance.now();
-    console.log(stop - start);
+    /*stop = performance.now();
+    console.log(stop - start);*/
   }
 
   getOrCreateChunk(x, z) {

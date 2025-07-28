@@ -6,7 +6,7 @@ export class RemotePlayer extends Player {
     constructor(world, id, data) {
         super(world, id, data);
         this.targetPosition = this.getPosition();
-        this.object = createMinecraftPlayer().object;
+        this.object = createMinecraftPlayer('textures/steve.png').object;
         this.object.position.copy(this.position);
         this.object.castShadow = true;
         this.world.scene.add(this.object);
