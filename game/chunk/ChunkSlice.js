@@ -15,6 +15,7 @@ export default class ChunkSlice {
     this.transparentMesh = null;
     this.opaqueMesh = null;
     this.create = true;
+    this.update = false;
   }
 
   getBlock(x, y, z) {
@@ -22,9 +23,9 @@ export default class ChunkSlice {
     return this.data.getBlock(x, y, z) & 0xFF;
   }
 
-  setBlock(x, y, z, id) {
+  setBlock(x, y, z, id, setDirty = true) {
     if (isOutside3D(x, y, z)) return;
     this.data = this.data.setBlock(x, y, z, id & 0xFF);
-    this.dirty = true;
+    if (setDirty) this.dirty = true;
   }
 };

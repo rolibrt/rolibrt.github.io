@@ -1,14 +1,13 @@
 import { Player } from '../game/entity/Player.js';
+import { createMinecraftPlayer } from './PlayerModel.js';
 import * as THREE from 'three';
 
 export class RemotePlayer extends Player {
     constructor(world, id, data) {
         super(world, id, data);
         this.targetPosition = this.getPosition();
-        // Simple capsule or box for now
-        const geometry = new THREE.CapsuleGeometry(0.4, 1.0, 4, 8);
-        const material = new THREE.MeshStandardMaterial({ color: 0x00ffff });
-        this.object = new THREE.Mesh(geometry, material);
+        this.object = createMinecraftPlayer().object;
+        this.object.position.copy(this.position);
         this.object.castShadow = true;
         this.world.scene.add(this.object);
     }

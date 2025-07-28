@@ -14,7 +14,7 @@ export class LocalPlayer extends Player {
             up: false, down: false,
         };
 
-        this.speed = 20;
+        this.speed = 5;
         this.setupKeyboardListeners();
 
         // Use camera object as the visual representation

@@ -38,7 +38,7 @@ const playerData = {
   name: 'Player',
   position: {
     x: 0,
-    y: 50,
+    y: 47,
     z: 0,
   },
   yaw: 90,
@@ -53,9 +53,9 @@ players.set(localPlayer.id, localPlayer);
 const otherData = {
   name: 'Other',
   position: {
-    x: 5,
-    y: 55,
-    z: 5,
+    x: 0,
+    y: 47,
+    z: 0,
   },
   yaw: 45,
   pitch: 5,
@@ -104,4 +104,4 @@ function simulateRemoteMovement() {
 }
 
 // Call simulateRemoteMovement every 2 seconds
-setInterval(simulateRemoteMovement, 500);
+//setInterval(simulateRemoteMovement, 500);
