@@ -8,7 +8,8 @@ export function createMeshFromGeometry([opaque, transparent]) {
   opaqueGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(opaque.uvs, 2));
   opaqueGeometry.setIndex(opaque.indices);
   const opaqueMaterial = new THREE.MeshLambertMaterial({
-    map: atlasTexture
+    map: atlasTexture,
+    side: THREE.BackSide
   });
 
   const transparentGeometry = new THREE.BufferGeometry();
@@ -20,6 +21,7 @@ export function createMeshFromGeometry([opaque, transparent]) {
     map: atlasTexture,
     transparent: true,
     alphaTest: 0.5,
+    side: THREE.BackSide
   });
   return [new THREE.Mesh(opaqueGeometry, opaqueMaterial), new THREE.Mesh(transparentGeometry, transparentMaterial)];
 }

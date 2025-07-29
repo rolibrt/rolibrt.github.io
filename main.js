@@ -104,4 +104,4 @@ function simulateRemoteMovement() {
 }
 
 // Call simulateRemoteMovement every 2 seconds
-//setInterval(simulateRemoteMovement, 500);
+setInterval(simulateRemoteMovement, 500);
